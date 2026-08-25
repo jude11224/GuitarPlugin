@@ -96,60 +96,92 @@ void GuitarPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, 
     const auto lowpassAmount = 1.0f - std::exp(-2.0f * juce::MathConstants<float>::pi * cabCutoff
                                                / static_cast<float>(currentSampleRate));
 
-    for (auto channel = 0; channel < getTotalNumInputChannels(); ++channel)
+// ============================================================
+// INPUT / GATE / PRE-PEDAL
+// ============================================================
+
+for (auto channel = 0;
+     channel < getTotalNumInputChannels();
+     ++channel)
+{
+    auto* samples = buffer.getWritePointer(channel);
+
+    for (auto sample = 0;
+         sample < buffer.getNumSamples();
+         ++sample)
     {
-        auto* samples = buffer.getWritePointer(channel);
-        auto lowpassState = cabLowpassState[static_cast<size_t>(channel)];
+        float value = samples[sample] * inputGain;
 
-        for (auto sample = 0; sample < buffer.getNumSamples(); ++sample)
+        if (mode == 1)
         {
-            auto value = samples[sample] * inputGain;
+            // Noise gate
+            if (std::abs(value) < gateThreshold)
+                value = 0.0f;
 
-            if (mode == 1)
-            {
-                if (std::abs(value) < gateThreshold)
-                    value = 0.0f;
-
-                value *= prePedalGain;
-
-                if (! ampNamModel.isLoaded())
-                    value = std::tanh(value * driveGain * ampVoiceGain);
-
-                value *= toneGain;
-                value *= masterGain;
-
-                value *= postEqGain;
-                value *= postPedalGain;
-            }
-
-            samples[sample] = value * outputGain;
+            // Pre-amp pedal level
+            value *= prePedalGain;
         }
 
-        cabLowpassState[static_cast<size_t>(channel)] = lowpassState;
+        samples[sample] = value;
     }
+}
 
-    if (mode == 1)
+
+// ============================================================
+// AMP
+// ============================================================
+
+if (mode == 1)
+{
+    if (ampNamModel.isLoaded())
     {
+        // Real Neural Amp Modeler amp
         ampNamModel.process(buffer);
+    }
+    else
+    {
+        // Fallback only if NAM failed
+        const auto fallbackGain =
+            driveGain * ampVoiceGain;
 
-        juce::dsp::AudioBlock<float> block(buffer);
-        juce::dsp::ProcessContextReplacing<float> context(block);
-        cabConvolution.process(context);
-
-        for (auto channel = 0; channel < getTotalNumInputChannels(); ++channel)
+        for (auto channel = 0;
+             channel < getTotalNumInputChannels();
+             ++channel)
         {
             auto* samples = buffer.getWritePointer(channel);
-            auto lowpassState = cabLowpassState[static_cast<size_t>(channel)];
 
-            for (auto sample = 0; sample < buffer.getNumSamples(); ++sample)
+            for (auto sample = 0;
+                 sample < buffer.getNumSamples();
+                 ++sample)
             {
-                lowpassState += lowpassAmount * (samples[sample] - lowpassState);
-                samples[sample] = lowpassState;
+                samples[sample] =
+                    std::tanh(samples[sample] * fallbackGain);
             }
-
-            cabLowpassState[static_cast<size_t>(channel)] = lowpassState;
         }
     }
+}
+
+
+// ============================================================
+// AMP TONE / MASTER / EQ / POST PEDAL
+// ============================================================
+
+if (mode == 1)
+{
+    for (auto channel = 0;
+     channel < getTotalNumInputChannels();
+     ++channel)
+{
+    auto* samples = buffer.getWritePointer(channel);
+
+    for (auto sample = 0;
+         sample < buffer.getNumSamples();
+         ++sample)
+    {
+        samples[sample] *= outputGain;
+    }
+}
+}
 }
 
 juce::AudioProcessorEditor* GuitarPluginAudioProcessor::createEditor()
@@ -256,22 +288,46 @@ juce::String GuitarPluginAudioProcessor::getLoadedNamModelName() const
 
 juce::File GuitarPluginAudioProcessor::findAssetsDirectory() const
 {
-    const auto executable = juce::File::getSpecialLocation(juce::File::currentExecutableFile);
+    const auto executable =
+        juce::File::getSpecialLocation(
+            juce::File::currentExecutableFile);
 
-    const auto standaloneAssets = executable.getParentDirectory().getChildFile("Assets");
+    // Standalone:
+    // GuitarPlugin.exe
+    // Assets/
+    const auto standaloneAssets =
+        executable.getParentDirectory()
+                 .getChildFile("Assets");
+
     if (standaloneAssets.isDirectory())
+    {
+        DBG("Assets found (Standalone):");
+        DBG(standaloneAssets.getFullPathName());
+
         return standaloneAssets;
+    }
 
-    const auto vst3ResourcesAssets = executable.getParentDirectory()
-        .getParentDirectory()
-        .getChildFile("Resources")
-        .getChildFile("Assets");
+    // VST3:
+    // GuitarPlugin.vst3
+    //   Contents/
+    //     x86_64-win/
+    //     Resources/
+    //       Assets/
+    const auto vst3ResourcesAssets =
+        executable.getParentDirectory()
+                 .getParentDirectory()
+                 .getChildFile("Resources")
+                 .getChildFile("Assets");
+
     if (vst3ResourcesAssets.isDirectory())
-        return vst3ResourcesAssets;
+    {
+        DBG("Assets found (VST3 Resources):");
+        DBG(vst3ResourcesAssets.getFullPathName());
 
-    const auto sourceAssets = juce::File("C:/Users/jude0/Documents/GuitarPlugin/Assets");
-    if (sourceAssets.isDirectory())
-        return sourceAssets;
+        return vst3ResourcesAssets;
+    }
+
+    DBG("NAM ERROR: Could not find Assets directory");
 
     return {};
 }

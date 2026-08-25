@@ -24,27 +24,63 @@ bool NamModel::load(const juce::File& modelFile)
     loadedModelName.clear();
 
 #if GUITARPLUGIN_HAS_NAM
-    if (! modelFile.existsAsFile())
+
+    model.reset();
+
+    if (!modelFile.existsAsFile())
     {
+        DBG("NAM ERROR: File does not exist:");
+        DBG(modelFile.getFullPathName());
+        return false;
+    }
+
+    DBG("NAM: Loading model:");
+    DBG(modelFile.getFullPathName());
+
+    try
+    {
+        auto newModel =
+            nam::get_dsp(modelFile.getFullPathName().toStdString());
+
+        if (newModel == nullptr)
+        {
+            DBG("NAM ERROR: get_dsp() returned nullptr");
+            return false;
+        }
+
+        newModel->Reset(currentSampleRate, maxBlockSize);
+
+        model = std::move(newModel);
+
+        loadedModelName = modelFile.getFileNameWithoutExtension();
+
+        DBG("NAM: Successfully loaded:");
+        DBG(loadedModelName);
+
+        return true;
+    }
+    catch (const std::exception& e)
+    {
+        DBG("NAM ERROR:");
+        DBG(e.what());
+
+        model.reset();
+        return false;
+    }
+    catch (...)
+    {
+        DBG("NAM ERROR: Unknown exception");
+
         model.reset();
         return false;
     }
 
-    try
-    {
-        model = nam::get_dsp(modelFile.getFullPathName().toStdString());
-        model->Reset(currentSampleRate, maxBlockSize);
-        loadedModelName = modelFile.getFileNameWithoutExtension();
-        return true;
-    }
-    catch (...)
-    {
-        model.reset();
-        return false;
-    }
 #else
+
+    DBG("NAM ERROR: GUITARPLUGIN_HAS_NAM is disabled");
     juce::ignoreUnused(modelFile);
     return false;
+
 #endif
 }
 
