@@ -1,0 +1,8 @@
+build/
+Builds/
+.vs/
+*.user
+*.suo
+*.log
+*.VC.db
+*.opendb
