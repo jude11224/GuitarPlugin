@@ -66,7 +66,72 @@ void GuitarPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, 
     const auto mode = static_cast<int>(modeParameter->load());
     const auto ampModel = static_cast<int>(ampModelParameter->load());
     const auto cabModel = static_cast<int>(cabModelParameter->load());
+
+    const auto inputGain = juce::Decibels::decibelsToGain(inputParameter->load());
+    const auto outputGain = juce::Decibels::decibelsToGain(outputParameter->load());
     const auto driveDb = driveParameter->load();
+    const auto driveGain = juce::Decibels::decibelsToGain(driveDb);
+
+    const auto gateThreshold = juce::Decibels::decibelsToGain(gateParameter->load());
+    const auto masterGain = juce::Decibels::decibelsToGain(masterParameter->load());
+
+    const auto bass = bassParameter->load();
+    const auto middle = middleParameter->load();
+    const auto treble = trebleParameter->load();
+
+    const auto cabTone = cabToneParameter->load();
+
+    const auto postEqGain =
+        juce::Decibels::decibelsToGain(
+            (eqLowParameter->load() * 0.18f)
+            + (eqMidParameter->load() * 0.12f)
+            + (eqHighParameter->load() * 0.18f));
+
+    const auto prePedalGain =
+        juce::Decibels::decibelsToGain(
+            prePedalLevelParameter->load());
+
+    const auto postPedalGain =
+        juce::Decibels::decibelsToGain(
+            postPedalLevelParameter->load());
+
+    const auto ampVoiceGain =
+        ampModel == 1 ? 1.25f :
+        (ampModel == 2 ? 0.85f : 1.0f);
+
+    const auto toneGain =
+        juce::Decibels::decibelsToGain(
+            (bass * 0.20f)
+            + (middle * 0.12f)
+            + (treble * 0.20f));
+
+    const auto cabBaseCutoff =
+        cabModel == 1 ? 5600.0f :
+        (cabModel == 2 ? 7400.0f : 6500.0f);
+
+    const auto cabCutoff =
+        juce::jlimit(
+            1800.0f,
+            11000.0f,
+            cabBaseCutoff
+            + juce::jmap(
+                cabTone,
+                0.0f,
+                10.0f,
+                -2200.0f,
+                2600.0f));
+
+    const auto lowpassAmount =
+        1.0f - std::exp(
+            -2.0f
+            * juce::MathConstants<float>::pi
+            * cabCutoff
+            / static_cast<float>(currentSampleRate));
+
+
+// ============================================================
+// LOAD AMP / CAB
+// ============================================================
 
     if (cabModel != loadedCabModel)
         loadCabImpulse(cabModel);
@@ -74,76 +139,82 @@ void GuitarPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, 
     if (ampModel != loadedAmpModel)
         loadAmpModel(ampModel);
 
-    const auto inputGain = juce::Decibels::decibelsToGain(inputParameter->load());
-    const auto outputGain = juce::Decibels::decibelsToGain(outputParameter->load());
-    const auto driveGain = juce::Decibels::decibelsToGain(driveDb);
-    const auto gateThreshold = juce::Decibels::decibelsToGain(gateParameter->load());
-    const auto masterGain = juce::Decibels::decibelsToGain(masterParameter->load());
-    const auto bass = bassParameter->load();
-    const auto middle = middleParameter->load();
-    const auto treble = trebleParameter->load();
-    const auto cabTone = cabToneParameter->load();
-    const auto postEqGain = juce::Decibels::decibelsToGain((eqLowParameter->load() * 0.18f)
-                                                           + (eqMidParameter->load() * 0.12f)
-                                                           + (eqHighParameter->load() * 0.18f));
-    const auto prePedalGain = juce::Decibels::decibelsToGain(prePedalLevelParameter->load());
-    const auto postPedalGain = juce::Decibels::decibelsToGain(postPedalLevelParameter->load());
-
-    const auto ampVoiceGain = ampModel == 1 ? 1.25f : (ampModel == 2 ? 0.85f : 1.0f);
-    const auto toneGain = juce::Decibels::decibelsToGain((bass * 0.20f) + (middle * 0.12f) + (treble * 0.20f));
-    const auto cabBaseCutoff = cabModel == 1 ? 5600.0f : (cabModel == 2 ? 7400.0f : 6500.0f);
-    const auto cabCutoff = juce::jlimit(1800.0f, 11000.0f, cabBaseCutoff + juce::jmap(cabTone, 0.0f, 10.0f, -2200.0f, 2600.0f));
-    const auto lowpassAmount = 1.0f - std::exp(-2.0f * juce::MathConstants<float>::pi * cabCutoff
-                                               / static_cast<float>(currentSampleRate));
 
 // ============================================================
-// INPUT / GATE / PRE-PEDAL
+// INPUT / GATE / PRE-PEDAL / DRIVE
 // ============================================================
 
-for (auto channel = 0;
-     channel < getTotalNumInputChannels();
-     ++channel)
-{
-    auto* samples = buffer.getWritePointer(channel);
-
-    for (auto sample = 0;
-         sample < buffer.getNumSamples();
-         ++sample)
+    for (auto channel = 0;
+         channel < getTotalNumInputChannels();
+         ++channel)
     {
-        float value = samples[sample] * inputGain;
+        auto* samples = buffer.getWritePointer(channel);
 
-        if (mode == 1)
+        for (auto sample = 0;
+             sample < buffer.getNumSamples();
+             ++sample)
         {
-            // Noise gate
-            if (std::abs(value) < gateThreshold)
-                value = 0.0f;
+            float value = samples[sample] * inputGain;
 
-            // Pre-amp pedal level
-            value *= prePedalGain;
+            if (mode == 1)
+            {
+                // Noise gate
+                if (std::abs(value) < gateThreshold)
+                    value = 0.0f;
+
+                // Pre-amp pedal level
+                value *= prePedalGain;
+
+                // Drive knob pushes the NAM capture harder
+                value *= driveGain;
+            }
+
+            samples[sample] = value;
         }
-
-        samples[sample] = value;
     }
-}
 
 
 // ============================================================
 // AMP
 // ============================================================
 
-if (mode == 1)
-{
-    if (ampNamModel.isLoaded())
+    if (mode == 1)
     {
-        // Real Neural Amp Modeler amp
-        ampNamModel.process(buffer);
-    }
-    else
-    {
-        // Fallback only if NAM failed
-        const auto fallbackGain =
-            driveGain * ampVoiceGain;
+        if (ampNamModel.isLoaded())
+        {
+            // Process through the selected NAM capture.
+            // The Gain knob has already been applied above.
+            ampNamModel.process(buffer);
+        }
+        else
+        {
+            // Fallback only if NAM failed to load.
+            const auto fallbackGain = ampVoiceGain;
 
+            for (auto channel = 0;
+                 channel < getTotalNumInputChannels();
+                 ++channel)
+            {
+                auto* samples = buffer.getWritePointer(channel);
+
+                for (auto sample = 0;
+                     sample < buffer.getNumSamples();
+                     ++sample)
+                {
+                    samples[sample] =
+                        std::tanh(samples[sample] * fallbackGain);
+                }
+            }
+        }
+    }
+
+
+// ============================================================
+// AMP TONE / MASTER / EQ / POST PEDAL
+// ============================================================
+
+    if (mode == 1)
+    {
         for (auto channel = 0;
              channel < getTotalNumInputChannels();
              ++channel)
@@ -154,36 +225,11 @@ if (mode == 1)
                  sample < buffer.getNumSamples();
                  ++sample)
             {
-                samples[sample] =
-                    std::tanh(samples[sample] * fallbackGain);
+                samples[sample] *= outputGain;
             }
         }
     }
 }
-
-
-// ============================================================
-// AMP TONE / MASTER / EQ / POST PEDAL
-// ============================================================
-
-if (mode == 1)
-{
-    for (auto channel = 0;
-     channel < getTotalNumInputChannels();
-     ++channel)
-{
-    auto* samples = buffer.getWritePointer(channel);
-
-    for (auto sample = 0;
-         sample < buffer.getNumSamples();
-         ++sample)
-    {
-        samples[sample] *= outputGain;
-    }
-}
-}
-}
-
 juce::AudioProcessorEditor* GuitarPluginAudioProcessor::createEditor()
 {
     return new GuitarPluginAudioProcessorEditor(*this);
@@ -363,19 +409,19 @@ juce::File GuitarPluginAudioProcessor::getAmpCaptureFile(int ampModel) const
     {
         return assets.getChildFile("NAM")
             .getChildFile("JCM800")
-            .getChildFile("JCM800.nam");
+            .getChildFile("AMP - JCM800 Gain 6.nam");
     }
 
     if (ampModel == 2)
     {
         return assets.getChildFile("NAM")
             .getChildFile("TwinReverb")
-            .getChildFile("TwinReverb.nam");
+            .getChildFile("01 Fender Ch2 Vib.nam");
     }
 
     return assets.getChildFile("NAM")
         .getChildFile("VoxAC30")
-        .getChildFile("AC30.nam");
+        .getChildFile("AC30 TBL Capture 06 V13.5 DI.nam");
 }
 
 void GuitarPluginAudioProcessor::loadCabImpulse(int cabModel)
@@ -392,21 +438,16 @@ void GuitarPluginAudioProcessor::loadCabImpulse(int cabModel)
     loadedCabModel = cabModel;
 }
 
-void GuitarPluginAudioProcessor::loadAmpModel(int ampModel, float gainDb)
+void GuitarPluginAudioProcessor::loadAmpModel(int ampModel)
 {
-    const auto slot = getAmpCaptureSlot(ampModel, gainDb);
-
-    if (ampNamModel.load(getAmpCaptureFile(ampModel, gainDb)))
+    if (ampNamModel.load(getAmpCaptureFile(ampModel)))
     {
         loadedAmpModel = ampModel;
-        loadedAmpCaptureSlot = slot;
         return;
     }
 
     loadedAmpModel = -1;
-    loadedAmpCaptureSlot = -1;
 }
-
 juce::AudioProcessorValueTreeState::ParameterLayout GuitarPluginAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
