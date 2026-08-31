@@ -37,7 +37,7 @@ void GuitarPluginAudioProcessor::prepareToPlay(double sampleRate, int samplesPer
     spec.numChannels = static_cast<juce::uint32>(juce::jmax(1, getTotalNumOutputChannels()));
     cabConvolution.prepare(spec);
     ampNamModel.prepare(sampleRate, samplesPerBlock, getTotalNumInputChannels());
-    loadAmpModel(static_cast<int>(ampModelParameter->load()), driveParameter->load());
+    loadAmpModel(static_cast<int>(ampModelParameter->load()));
     loadCabImpulseForCurrentSelection();
 }
 
