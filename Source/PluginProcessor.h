@@ -68,14 +68,9 @@ private:
     double currentSampleRate = 44100.0;
     int loadedCabModel = -1;
     int loadedAmpModel = -1;
-    int loadedAmpCaptureSlot = -1;
 
-    juce::File findAssetsDirectory() const;
-    juce::File getCabImpulseFile(int cabModel) const;
-    juce::File getAmpCaptureFile(int ampModel, float gainDb) const;
-    int getAmpCaptureSlot(int ampModel, float gainDb) const;
-    void loadCabImpulse(int cabModel);
-    void loadAmpModel(int ampModel, float gainDb);
+    juce::File getAmpCaptureFile(int ampModel) const;
+    void loadAmpModel(int ampModel);
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GuitarPluginAudioProcessor)
 };
