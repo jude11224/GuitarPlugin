@@ -67,12 +67,12 @@ void GuitarPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, 
     const auto ampModel = static_cast<int>(ampModelParameter->load());
     const auto cabModel = static_cast<int>(cabModelParameter->load());
     const auto driveDb = driveParameter->load();
-    const auto ampCaptureSlot = getAmpCaptureSlot(ampModel, driveDb);
 
     if (cabModel != loadedCabModel)
         loadCabImpulse(cabModel);
-    if (ampModel != loadedAmpModel || ampCaptureSlot != loadedAmpCaptureSlot)
-        loadAmpModel(ampModel, driveDb);
+
+    if (ampModel != loadedAmpModel)
+        loadAmpModel(ampModel);
 
     const auto inputGain = juce::Decibels::decibelsToGain(inputParameter->load());
     const auto outputGain = juce::Decibels::decibelsToGain(outputParameter->load());
@@ -355,63 +355,27 @@ juce::File GuitarPluginAudioProcessor::getCabImpulseFile(int cabModel) const
         .getChildFile("TF 64 AC30 2X12 BLUE - 57 R121 70-30.wav");
 }
 
-int GuitarPluginAudioProcessor::getAmpCaptureSlot(int ampModel, float gainDb) const
-{
-    if (ampModel == 1)
-        return juce::jlimit(0, 6, static_cast<int>(std::round(juce::jmap(gainDb, 0.0f, 30.0f, 0.0f, 6.0f))));
-
-    if (ampModel == 2)
-        return juce::jlimit(0, 6, static_cast<int>(std::round(juce::jmap(gainDb, 0.0f, 30.0f, 0.0f, 6.0f))));
-
-    return juce::jlimit(0, 6, static_cast<int>(std::round(juce::jmap(gainDb, 0.0f, 30.0f, 0.0f, 6.0f))));
-}
-
-juce::File GuitarPluginAudioProcessor::getAmpCaptureFile(int ampModel, float gainDb) const
+juce::File GuitarPluginAudioProcessor::getAmpCaptureFile(int ampModel) const
 {
     const auto assets = findAssetsDirectory();
-    const auto slot = getAmpCaptureSlot(ampModel, gainDb);
 
     if (ampModel == 1)
     {
-        const juce::StringArray captures {
-            "AMP - JCM800 Gain 3.nam",
-            "AMP - JCM800 Gain 4.nam",
-            "AMP - JCM800 Gain 5.nam",
-            "AMP - JCM800 Gain 6.nam",
-            "AMP - JCM800 Gain 7.nam",
-            "AMP - JCM800 Gain 8.nam",
-            "AMP - JCM800 Gain 9.nam"
-        };
-
-        return assets.getChildFile("NAM").getChildFile("JCM800").getChildFile(captures[slot]);
+        return assets.getChildFile("NAM")
+            .getChildFile("JCM800")
+            .getChildFile("JCM800.nam");
     }
 
     if (ampModel == 2)
     {
-        const juce::StringArray captures {
-            "01 Fender Ch2 Vib.nam",
-            "05 Fender Twin Reverb TS808 g-05 di half.nam",
-            "08 Fender Twin Reverb TS808 g-5 di 75.nam",
-            "10 Fender Twin Reverb TS10 g0 difull.nam",
-            "05 Fender Twin Reverb TS808 g-11 di half.nam",
-            "02 Fender Twin Reverb TS808 g-17 di 5.nam",
-            "11 Fender Twin Reverb Bogner Blue High.nam"
-        };
-
-        return assets.getChildFile("NAM").getChildFile("TwinReverb").getChildFile(captures[slot]);
+        return assets.getChildFile("NAM")
+            .getChildFile("TwinReverb")
+            .getChildFile("TwinReverb.nam");
     }
 
-    const juce::StringArray captures {
-        "AC30 TBL Capture 03 V08 DI.nam",
-        "AC30 TBL Capture 02 V09 DI.nam",
-        "AC30 TBL Capture 05 V10.5 DI.nam",
-        "AC30 TBL Capture 01 V12 DI.nam",
-        "AC30 TBL Capture 06 V13.5 DI.nam",
-        "AC30 TBL Capture 04 V15 DI.nam",
-        "AC30 TBL Capture 07 V17 DI.nam"
-    };
-
-    return assets.getChildFile("NAM").getChildFile("VoxAC30").getChildFile(captures[slot]);
+    return assets.getChildFile("NAM")
+        .getChildFile("VoxAC30")
+        .getChildFile("AC30.nam");
 }
 
 void GuitarPluginAudioProcessor::loadCabImpulse(int cabModel)
