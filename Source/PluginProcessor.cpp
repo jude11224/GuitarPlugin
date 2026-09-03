@@ -214,19 +214,23 @@ void GuitarPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, 
 // ============================================================
 
     if (mode == 1)
-    {
-        for (auto channel = 0;
-             channel < getTotalNumInputChannels();
-             ++channel)
-        {
-            auto* samples = buffer.getWritePointer(channel);
+{
+    juce::dsp::AudioBlock<float> block(buffer);
+    juce::dsp::ProcessContextReplacing<float> context(block);
+    cabConvolution.process(context);
 
-            for (auto sample = 0;
-                 sample < buffer.getNumSamples();
-                 ++sample)
-            {
-                samples[sample] *= outputGain;
-            }
+    for (auto channel = 0; channel < getTotalNumInputChannels(); ++channel)
+    {
+        auto* samples = buffer.getWritePointer(channel);
+        for (auto sample = 0; sample < buffer.getNumSamples(); ++sample)
+        {
+            float value = samples[sample];
+            value *= toneGain;
+            value *= postEqGain;
+            value *= postPedalGain;
+            value *= masterGain;
+            value *= outputGain;
+            samples[sample] = value;
         }
     }
 }

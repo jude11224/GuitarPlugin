@@ -98,17 +98,38 @@ void NamModel::process(juce::AudioBuffer<float>& buffer)
         monoOutput.setSize(1, samples, false, false, true);
     }
 
-    for (auto channel = 0; channel < buffer.getNumChannels(); ++channel)
+    void NamModel::process(juce::AudioBuffer<float>& buffer)
+{
+#if GUITARPLUGIN_HAS_NAM
+    if (model == nullptr)
+        return;
+
+    const auto samples = buffer.getNumSamples();
+    const auto numChannels = buffer.getNumChannels();
+
+    if (samples > monoInput.getNumSamples())
     {
-        monoInput.copyFrom(0, 0, buffer, channel, 0, samples);
-        monoOutput.clear();
-
-        float* inputChannels[] = { monoInput.getWritePointer(0) };
-        float* outputChannels[] = { monoOutput.getWritePointer(0) };
-        model->process(inputChannels, outputChannels, samples);
-
-        buffer.copyFrom(channel, 0, monoOutput, 0, 0, samples);
+        monoInput.setSize(1, samples, false, false, true);
+        monoOutput.setSize(1, samples, false, false, true);
     }
+
+    monoInput.copyFrom(0, 0, buffer, 0, 0, samples);
+    for (auto channel = 1; channel < numChannels; ++channel)
+        monoInput.addFrom(0, 0, buffer, channel, 0, samples);
+    if (numChannels > 1)
+        monoInput.applyGain(1.0f / static_cast<float>(numChannels));
+
+    monoOutput.clear();
+    float* inputChannels[] = { monoInput.getWritePointer(0) };
+    float* outputChannels[] = { monoOutput.getWritePointer(0) };
+    model->process(inputChannels, outputChannels, samples);
+
+    for (auto channel = 0; channel < numChannels; ++channel)
+        buffer.copyFrom(channel, 0, monoOutput, 0, 0, samples);
+#else
+    juce::ignoreUnused(buffer);
+#endif
+}
 #else
     juce::ignoreUnused(buffer);
 #endif
