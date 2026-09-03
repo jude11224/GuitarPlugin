@@ -214,26 +214,28 @@ void GuitarPluginAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, 
 // ============================================================
 
     if (mode == 1)
-{
-    juce::dsp::AudioBlock<float> block(buffer);
-    juce::dsp::ProcessContextReplacing<float> context(block);
-    cabConvolution.process(context);
-
-    for (auto channel = 0; channel < getTotalNumInputChannels(); ++channel)
     {
-        auto* samples = buffer.getWritePointer(channel);
-        for (auto sample = 0; sample < buffer.getNumSamples(); ++sample)
+        juce::dsp::AudioBlock<float> block(buffer);
+        juce::dsp::ProcessContextReplacing<float> context(block);
+        cabConvolution.process(context);
+
+        for (auto channel = 0; channel < getTotalNumInputChannels(); ++channel)
         {
-            float value = samples[sample];
-            value *= toneGain;
-            value *= postEqGain;
-            value *= postPedalGain;
-            value *= masterGain;
-            value *= outputGain;
-            samples[sample] = value;
+            auto* samples = buffer.getWritePointer(channel);
+            for (auto sample = 0; sample < buffer.getNumSamples(); ++sample)
+            {
+                float value = samples[sample];
+                value *= toneGain;
+                value *= postEqGain;
+                value *= postPedalGain;
+                value *= masterGain;
+                value *= outputGain;
+                samples[sample] = value;
+            }
         }
     }
 }
+
 juce::AudioProcessorEditor* GuitarPluginAudioProcessor::createEditor()
 {
     return new GuitarPluginAudioProcessorEditor(*this);
@@ -452,6 +454,7 @@ void GuitarPluginAudioProcessor::loadAmpModel(int ampModel)
 
     loadedAmpModel = -1;
 }
+
 juce::AudioProcessorValueTreeState::ParameterLayout GuitarPluginAudioProcessor::createParameterLayout()
 {
     std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;

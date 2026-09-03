@@ -1,4 +1,5 @@
 #include "NamModel.h"
+#include <filesystem>
 
 #if GUITARPLUGIN_HAS_NAM
 #include <NAM/get_dsp.h>
@@ -40,7 +41,7 @@ bool NamModel::load(const juce::File& modelFile)
     try
     {
         auto newModel =
-            nam::get_dsp(modelFile.getFullPathName().toStdString());
+            nam::get_dsp(std::filesystem::path(modelFile.getFullPathName().toStdString()));
 
         if (newModel == nullptr)
         {
@@ -91,7 +92,11 @@ void NamModel::process(juce::AudioBuffer<float>& buffer)
         return;
 
     const auto samples = buffer.getNumSamples();
+<<<<<<< Updated upstream
     const auto channels = buffer.getNumChannels();
+=======
+    const auto numChannels = buffer.getNumChannels();
+>>>>>>> Stashed changes
 
     if (samples > monoInput.getNumSamples())
     {
@@ -123,7 +128,10 @@ void NamModel::process(juce::AudioBuffer<float>& buffer)
 
     for (int channel = 0; channel < channels; ++channel)
         buffer.copyFrom(channel, 0, monoOutput, 0, 0, samples);
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
 #else
     juce::ignoreUnused(buffer);
 #endif

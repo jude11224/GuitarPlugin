@@ -72,5 +72,9 @@ private:
     juce::File getAmpCaptureFile(int ampModel) const;
     void loadAmpModel(int ampModel);
 
+    juce::File getCabImpulseFile(int cabModel) const;
+    void loadCabImpulse(int cabModel);
+    juce::File findAssetsDirectory() const;
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GuitarPluginAudioProcessor)
 };
