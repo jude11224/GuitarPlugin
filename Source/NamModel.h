@@ -1,9 +1,9 @@
 #pragma once
 
 #include <JuceHeader.h>
-
-#if GUITARPLUGIN_HAS_NAM
 #include <memory>
+
+#if defined(GUITARPLUGIN_HAS_NAM) && GUITARPLUGIN_HAS_NAM
 #include <NAM/dsp.h>
 #endif
 
@@ -22,7 +22,7 @@ private:
     int numChannels = 2;
     juce::String loadedModelName;
 
-#if GUITARPLUGIN_HAS_NAM
+#if defined(GUITARPLUGIN_HAS_NAM) && GUITARPLUGIN_HAS_NAM
     std::unique_ptr<nam::DSP> model;
     juce::AudioBuffer<float> monoInput;
     juce::AudioBuffer<float> monoOutput;
